@@ -19,7 +19,7 @@ To build. This application was written for and tested on Linux.
 
 The program's usage statement is as shown:
 
-    usage: ./caesar [-h] (-d key | -e key) <msg>
+    usage: ./caesar [-h] (-d key | -e key) [msg]
 
     Encrypt or decrypt the supplied message with a given key. The
     key should be a positive integer. This integer is used to either
@@ -32,7 +32,7 @@ The program's usage statement is as shown:
     -h   Display program usage
     -d   Decrypt message using the given key
     -e   Encrypt message using the given key
-    msg  ASCII text to encrypt or decrypt
+    msg  ASCII text to encrypt or decrypt. If omitted, read from stdin.
 
 For example, to encrypt "This is a message!" by right-shifting by 6:
 
@@ -43,3 +43,8 @@ To decrypt:
 
     ./caesar -d 6 "Znoy oy g skyygmk!"
     This is a message!
+
+Messages can also be read from stdin:
+
+    ./caesar -e 23 "This is a message that I have typed into the terminal!" | ./caesar -d 23
+    This is a message that I have typed into the terminal!

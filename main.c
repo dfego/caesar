@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 const int ALPHABET_SIZE = 26;
 
@@ -50,18 +51,28 @@ static char crypt_char(int shift, char c)
  * @brief Crypt an ASCII string, not changing non-alphabetic characters
  * @param shift Number of characters to logically right-shift
  * @param in    String to crypt
- * @param out   Output buffer to write to. Must be at least as long as @in
- * @return @out
+ * @param out   Output stream to write to
  */
-static char *crypt_str(int shift, const char *in, char *out)
+static void crypt_str(int shift, const char *in, FILE *out)
 {
     int len = strlen(in);
     for (int i = 0; i < len; i++) {
-        out[i] = crypt_char(shift, in[i]);
+        fputc(crypt_char(shift, in[i]), out);
     }
-    out[len] = '\0';
+}
 
-    return out;
+/**
+ * @brief Crypt an ASCII string stream, not changing non-alphabetic characters
+ * @param shift Number of characters to logically right-shift
+ * @param in    Input stream to read from
+ * @param out   Output stream to write to
+ */
+static void crypt_stream(int shift, FILE *in, FILE *out)
+{
+    int in_char;
+    while ((in_char = fgetc(in)) != EOF) {
+        fputc(crypt_char(shift, in_char), out);
+    }
 }
 
 /**
@@ -70,20 +81,22 @@ static char *crypt_str(int shift, const char *in, char *out)
  */
 static void usage(char *prog)
 {
-    printf("usage: %s [-h] (-d key | -e key) <msg>\n", prog);
-    printf("\n");
-    printf(
+    fprintf(stderr, "usage: %s [-h] (-d key | -e key) [msg]\n", prog);
+    fprintf(stderr, "\n");
+    fprintf(
+        stderr,
         "Encrypt or decrypt the supplied message with a given key. The\n"
         "key should be a positive integer. This integer is used to either\n"
         "right-shift (encrypt) or left-shift (decrypt) the ASCII characters\n"
         "in the message.\n\n"
         "Any non-ASCII characters in the message are left unchanged. The\n"
         "encrypted or decrypted message is written to standard output.\n");
-    printf("\n");
-    printf("-h   Display program usage\n");
-    printf("-d   Decrypt message using the given key\n");
-    printf("-e   Encrypt message using the given key\n");
-    printf("msg  ASCII text to encrypt or decrypt\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "-h   Display program usage\n");
+    fprintf(stderr, "-d   Decrypt message using the given key\n");
+    fprintf(stderr, "-e   Encrypt message using the given key\n");
+    fprintf(stderr, "msg  ASCII text to encrypt or decrypt. If omitted, read "
+                    "from stdin.\n");
     exit(1);
 }
 
@@ -130,7 +143,8 @@ int main(int argc, char *argv[])
         switch (c) {
         case 'd':
             if (mode != cm_unset) {
-                printf("%s: only -d or -e may be specified\n", argv[0]);
+                fprintf(stderr, "%s: only -d or -e may be specified\n",
+                        argv[0]);
                 usage(argv[0]); // exits
             }
             mode = cm_decrypt;
@@ -138,7 +152,8 @@ int main(int argc, char *argv[])
             break;
         case 'e':
             if (mode != cm_unset) {
-                printf("%s: only -d or -e may be specified\n", argv[0]);
+                fprintf(stderr, "%s: only -d or -e may be specified\n",
+                        argv[0]);
                 usage(argv[0]); // exits
             }
             mode = cm_encrypt;
@@ -151,36 +166,33 @@ int main(int argc, char *argv[])
     }
 
     if (mode == cm_unset) {
-        printf("%s: either -d or -e are required\n", argv[0]);
+        fprintf(stderr, "%s: either -d or -e are required\n", argv[0]);
         usage(argv[0]); // exits
     }
 
     if (shift < 0) {
-        printf("%s: key must be a positive base 10 integer\n", argv[0]);
-        usage(argv[0]); // exits
-    }
-
-    if (argv[optind] == NULL) {
-        printf("%s: missing required argument: msg\n", argv[0]);
+        fprintf(stderr, "%s: key must be a positive base 10 integer\n",
+                argv[0]);
         usage(argv[0]); // exits
     }
 
     /** Encrypt or decrypt message **/
 
     char *message = argv[optind];
-    int message_len = strlen(message);
-    char *crypted = calloc(1, message_len);
-    if (crypted == NULL) {
-        printf("%s: cannot allocate %d bytes for output message. aborting.\n",
-               argv[0], message_len);
-        return 2;
-    }
 
     // Simply pass in a negative offset for decryption
     shift = (mode == cm_encrypt) ? shift : -shift;
 
-    printf("%s\n", crypt_str(shift, message, crypted));
-    free(crypted);
+    if (message == NULL) {
+        crypt_stream(shift, stdin, stdout);
+    } else {
+        crypt_str(shift, message, stdout);
+    }
+
+    // Add a newline if stdout is a terminal, for readability
+    if (isatty(STDOUT_FILENO)) {
+        fputc('\n', stdout);
+    }
 
     return 0;
 }
